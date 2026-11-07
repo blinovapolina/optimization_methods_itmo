@@ -182,48 +182,6 @@ def step7_check(
     return valid, rejected
 
 
-
-def _bordered_hessian(
-    L: sp.Expr,
-    constraints: list[sp.Expr],
-    variables: Sequence[sp.Symbol],
-    point: dict,
-) -> tuple[np.ndarray, str]:
-    n, m = len(variables), len(constraints)
-
-    J = np.array([
-        [float(sp.re(sp.diff(g, v).subs(point).evalf())) for v in variables]
-        for g in constraints
-    ], dtype=float)
-    H_xx = np.array([
-        [float(sp.re(sp.diff(L, vi, vj).subs(point).evalf())) for vj in variables]
-        for vi in variables
-    ], dtype=float)
-
-    H = np.zeros((m + n, m + n), dtype=float)
-    H[:m, m:] = J
-    H[m:, :m] = J.T
-    H[m:, m:] = H_xx
-
-    minors = []
-    for k in range(2 * m + 1, m + n + 1):
-        minors.append(float(np.linalg.det(H[:k, :k])))
-
-    if not minors or any(abs(d) < 1e-10 for d in minors):
-        return H, "unknown"
-
-    if m == 1:
-        return H, ("max" if minors[0] > 0 else "min")
-
-    signs = [np.sign(d) for d in minors]
-    if all(((-1) ** m) * s > 0 for s in signs):
-        return H, "min"
-    if all(((-1) ** k) * s > 0
-           for k, s in zip(range(2 * m + 1, m + n + 1), signs)):
-        return H, "max"
-    return H, "saddle"
-
-
 def step8_classify(
     valid_candidates: list[dict],
     f: sp.Expr,
@@ -231,18 +189,33 @@ def step8_classify(
     constraints: list[sp.Expr],
     variables: Sequence[sp.Symbol],
 ) -> list[dict]:
-    classified = []
+
+    enriched = []
     for p in valid_candidates:
         point_vars = {v: p[v] for v in variables}
         f_val = _numeric(f, point_vars)
-        H, verdict = _bordered_hessian(L, constraints, variables, p)
-        classified.append({
-            "point": p,
-            "f_value": f_val,
-            "hessian": H,
-            "hessian_verdict": verdict,
-        })
-    return classified
+        enriched.append({"point": p, "f_value": f_val})
+
+    if not enriched:
+        return []
+
+    f_min = min(c["f_value"] for c in enriched)
+    f_max = max(c["f_value"] for c in enriched)
+    tol = 1e-9
+
+
+    for c in enriched:
+        v = c["f_value"]
+        if abs(v - f_min) < tol and abs(v - f_max) < tol:
+            c["hessian_verdict"] = "min=max"
+        elif abs(v - f_min) < tol:
+            c["hessian_verdict"] = "min"
+        elif abs(v - f_max) < tol:
+            c["hessian_verdict"] = "max"
+        else:
+            c["hessian_verdict"] = "intermediate"
+
+    return enriched
 
 
 def step9_optimal(
