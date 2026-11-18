@@ -1,0 +1,24 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+class BrigadeDistributor {
+  - n : int
+  - f1 : list[int]
+  - f2 : list[int]
+  - f3 : list[int]
+  - d2 : tuple[int]
+  - min_x3 : int
+  - F1 : list[float]
+  - F2 : list[float]
+  - F3 : float
+  - X1 : list[int]
+  - X2 : list[int]
+  - X3 : int
+  --
+  + __init__(n, f1, f2, f3, d2, min_x3)
+  + solve() : tuple[int, int, int, float]
+  - _stage1() : void
+  - _stage2() : void
+  - _stage3() : void
+}
+@enduml
